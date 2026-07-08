@@ -4,6 +4,7 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entities/product.entity';
 import { Repository } from 'typeorm';
+import { PaginationQueryDto } from 'src/common/dto/pagination-query.dto';
 
 @Injectable()
 export class ProductsService {
@@ -17,8 +18,34 @@ export class ProductsService {
     return await this.productRepository.save(product);
   }
 
-  async findAll(): Promise<Product[]> {
-    return await this.productRepository.find({ order: { createdAt: 'DESC' } });
+  async findAll(paginationQuery: PaginationQueryDto) {
+    const { limit, offset } = paginationQuery;
+
+    /**
+     * findAndCount returns an array: [data, totalCount]
+     * ex: products?limit=20&offset=40
+     * SELECT * FROM products ORDER BY id DESC LIMIT 20 OFFSET 40;
+     */
+    const [data, totalItems] = await this.productRepository.findAndCount({
+      order: { createdAt: 'ASC' },
+      skip: offset, // Number of items to skip
+      take: limit, // Number of items to take
+    });
+
+    // Calculate metadata for the frontend
+    const currentPage = Math.floor(offset / limit) + 1;
+    const totalPages = Math.ceil(totalItems / limit);
+
+    return {
+      data,
+      meta: {
+        totalItems,
+        itemCount: data.length,
+        itemsPerPage: limit,
+        totalPages,
+        currentPage,
+      },
+    };
   }
 
   async findOne(id: string): Promise<Product> {
